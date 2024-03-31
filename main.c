@@ -7,14 +7,14 @@
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
 #define FORCES_CAPACITY 64
-#define SYSTEM_CAPACITY 256
+#define SYSTEM_CAPACITY 1024
 #define MASS_RADIUS 5.0f
 #define MASS_COLOR_SCALE 50.0f
-#define TIME_SCALE 5.0f
+#define TIME_SCALE 1.0f
 #define GRAVITATIONAL_ACCELERATION                                             \
   (Vector2) { 0.0f, 9.8f }
 
-Color color_lerp(Color c1, Color c2, float amount) {
+Color color_lerp(Color c1, Color c2, double amount) {
   Vector4 v1 = (Vector4){c1.r, c1.g, c1.b, c1.a};
   Vector4 v2 = (Vector4){c2.r, c2.g, c2.b, c2.a};
   Vector4 lerped = Vector4Lerp(v1, v2, Clamp(amount, 0.0f, 1.0f));
@@ -27,7 +27,7 @@ typedef struct {
   Vector2 acceleration;
   Vector2 forces[FORCES_CAPACITY];
   size_t force_count;
-  float mass;
+  double mass;
   _Bool fixed;
 } Mass;
 
@@ -42,7 +42,7 @@ void mass_force_append(Mass *mass, Vector2 force) {
 
 void mass_reset_forces(Mass *mass) { mass->force_count = 0; }
 
-void mass_update(Mass *mass, float dt) {
+void mass_update(Mass *mass, double dt) {
   if (mass->fixed) {
     return;
   }
@@ -67,9 +67,9 @@ void mass_draw(Mass *mass) {
 typedef struct {
   Mass *first;
   Mass *second;
-  float length;
-  float strength;
-  float dampening;
+  double length;
+  double strength;
+  double dampening;
 } Spring;
 
 void spring_update(Spring *spring) {
@@ -78,7 +78,7 @@ void spring_update(Spring *spring) {
   Vector2 force_direction = Vector2Normalize(span);
 
   // Spring force
-  float displacement = spring->length - Vector2Length(span);
+  double displacement = spring->length - Vector2Length(span);
   mass_force_append(
       spring->first,
       Vector2Scale(force_direction, spring->strength * -displacement));
@@ -87,11 +87,11 @@ void spring_update(Spring *spring) {
       Vector2Scale(force_direction, spring->strength * displacement));
 
   // Dampener force
-  float displacement_rate_first =
+  double displacement_rate_first =
       Vector2DotProduct(spring->first->velocity, force_direction);
-  float displacement_rate_second =
+  double displacement_rate_second =
       -Vector2DotProduct(spring->second->velocity, force_direction);
-  float displacement_rate = displacement_rate_first + displacement_rate_second;
+  double displacement_rate = displacement_rate_first + displacement_rate_second;
   mass_force_append(
       spring->first,
       Vector2Scale(force_direction, spring->dampening * -displacement_rate));
@@ -103,7 +103,7 @@ void spring_update(Spring *spring) {
 void spring_draw(Spring *spring) {
   Vector2 span =
       Vector2Subtract(spring->second->position, spring->first->position);
-  float relative_displacement =
+  double relative_displacement =
       (spring->length - Vector2Length(span)) / Vector2Length(span);
   Color c;
   if (relative_displacement < 0.0f) {
@@ -165,7 +165,7 @@ void system_spring_update(System *system) {
   }
 }
 
-void system_mass_update(System *system, float dt) {
+void system_mass_update(System *system, double dt) {
   for (size_t i = 0; i < system->mass_count; ++i) {
     mass_update(&system->masses[i], dt);
   }
@@ -177,12 +177,28 @@ void system_mass_reset_forces(System *system) {
   }
 }
 
+void system_mass_force_append(System *system, Vector2 force) {
+  for (size_t i = 0; i < system->mass_count; ++i) {
+    mass_force_append(&system->masses[i], force);
+  }
+}
+
+#define WIND_STRENGTH 10.0f
+#define DEFAULT_GRID_ROWS 20
+#define DEFAULT_GRID_COLS 20
+#define DEFAULT_GRID_SIZE 25.0f
+#define DEFAULT_GRID_ORIGIN                                                    \
+  (Vector2) { 10.0f, 10.0f }
+#define DEFAULT_GRID_MASS 1.0f
+#define DEFAULT_GRID_STRENGTH 1000.0f
+#define DEFAULT_GRID_DAMPENING 1.0f
 #define INIT_DEFAULT_GRID(system)                                              \
-  system_init_grid(system, 10, 10, (Vector2){10.0f, 10.0f}, 50.0f, 1.0f,       \
-                   10.0f, 1.0f)
+  system_init_grid(system, DEFAULT_GRID_ROWS, DEFAULT_GRID_COLS,               \
+                   DEFAULT_GRID_ORIGIN, DEFAULT_GRID_SIZE, DEFAULT_GRID_MASS,  \
+                   DEFAULT_GRID_STRENGTH, DEFAULT_GRID_DAMPENING)
 void system_init_grid(System *system, size_t rows, size_t cols, Vector2 origin,
-                      float cell_size, float mass, float spring_strength,
-                      float spring_dampening) {
+                      double cell_size, double mass, double spring_strength,
+                      double spring_dampening) {
   system->mass_count = 0;
   system->spring_count = 0;
 
@@ -225,13 +241,17 @@ int main(void) {
   SetTargetFPS(60);
 
   _Bool running = false;
+  _Bool wind_on = false;
 
   System system = {0};
   INIT_DEFAULT_GRID(&system);
 
   while (!WindowShouldClose()) {
     if (IsKeyPressed(KEY_SPACE)) {
-      running = (running) ? false : true;
+      running = !running;
+    }
+    if (IsKeyPressed(KEY_PERIOD)) {
+      wind_on = !wind_on;
     }
     if (IsKeyPressed(KEY_ENTER)) {
       INIT_DEFAULT_GRID(&system);
@@ -242,11 +262,15 @@ int main(void) {
     system_draw(&system);
     EndDrawing();
 
-    float dt = TIME_SCALE * GetFrameTime();
-    if (running) {
-      system_spring_update(&system);
-      system_mass_update(&system, dt);
-      system_mass_reset_forces(&system);
+    if (!running) {
+      continue;
+    }
+    double dt = TIME_SCALE * GetFrameTime();
+    system_spring_update(&system);
+    system_mass_update(&system, dt);
+    system_mass_reset_forces(&system);
+    if (wind_on) {
+      system_mass_force_append(&system, (Vector2){WIND_STRENGTH, 0.0f});
     }
   }
 
