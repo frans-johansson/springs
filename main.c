@@ -7,12 +7,25 @@
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
 #define FORCES_CAPACITY 64
-#define SYSTEM_CAPACITY 1024
-#define MASS_RADIUS 5.0f
-#define MASS_COLOR_SCALE 50.0f
+#define FORCES_CONSTRAINT 10e5
+#define SYSTEM_CAPACITY 8096
+#define MASS_RADIUS 8.0f
+#define MASS_COLOR_SCALE 100.0f
 #define TIME_SCALE 1.0f
+#define WIND_STRENGTH 75.0f
 #define GRAVITATIONAL_ACCELERATION                                             \
-  (Vector2) { 0.0f, 9.8f }
+  (Vector2) { 0.0f, 98.0f }
+
+#define DEFAULT_GRID_ROWS 40
+#define DEFAULT_GRID_COLS 60
+#define DEFAULT_GRID_SIZE 10.0f
+#define DEFAULT_GRID_ORIGIN                                                    \
+  (Vector2) {                                                                  \
+    WINDOW_WIDTH / 2.0f - DEFAULT_GRID_COLS *DEFAULT_GRID_SIZE * 0.5f, 0.0f    \
+  }
+#define DEFAULT_GRID_MASS 1.0f
+#define DEFAULT_GRID_STRENGTH 1000.0f
+#define DEFAULT_GRID_DAMPENING 5.0f
 
 Color color_lerp(Color c1, Color c2, double amount) {
   Vector4 v1 = (Vector4){c1.r, c1.g, c1.b, c1.a};
