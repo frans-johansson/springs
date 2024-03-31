@@ -55,6 +55,13 @@ void mass_force_append(Mass *mass, Vector2 force) {
 
 void mass_reset_forces(Mass *mass) { mass->force_count = 0; }
 
+void mass_constrain_forces(Mass *mass) {
+  for (size_t i = 0; i < mass->force_count; ++i) {
+    mass->forces[i] =
+        Vector2ClampValue(mass->forces[i], 0.0f, FORCES_CONSTRAINT);
+  }
+}
+
 void mass_update(Mass *mass, double dt) {
   if (mass->fixed) {
     return;
@@ -190,21 +197,18 @@ void system_mass_reset_forces(System *system) {
   }
 }
 
+void system_mass_constrain_forces(System *system) {
+  for (size_t i = 0; i < system->mass_count; ++i) {
+    mass_constrain_forces(&system->masses[i]);
+  }
+}
+
 void system_mass_force_append(System *system, Vector2 force) {
   for (size_t i = 0; i < system->mass_count; ++i) {
     mass_force_append(&system->masses[i], force);
   }
 }
 
-#define WIND_STRENGTH 10.0f
-#define DEFAULT_GRID_ROWS 20
-#define DEFAULT_GRID_COLS 20
-#define DEFAULT_GRID_SIZE 25.0f
-#define DEFAULT_GRID_ORIGIN                                                    \
-  (Vector2) { 10.0f, 10.0f }
-#define DEFAULT_GRID_MASS 1.0f
-#define DEFAULT_GRID_STRENGTH 1000.0f
-#define DEFAULT_GRID_DAMPENING 1.0f
 #define INIT_DEFAULT_GRID(system)                                              \
   system_init_grid(system, DEFAULT_GRID_ROWS, DEFAULT_GRID_COLS,               \
                    DEFAULT_GRID_ORIGIN, DEFAULT_GRID_SIZE, DEFAULT_GRID_MASS,  \
@@ -279,7 +283,9 @@ int main(void) {
       continue;
     }
     double dt = TIME_SCALE * GetFrameTime();
+    system_handle_mouse_input(&system);
     system_spring_update(&system);
+    system_mass_constrain_forces(&system);
     system_mass_update(&system, dt);
     system_mass_reset_forces(&system);
     if (wind_on) {
