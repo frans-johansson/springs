@@ -7,7 +7,7 @@
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
 #define FORCES_CAPACITY 64
-#define SYSTEM_CAPACITY 128
+#define SYSTEM_CAPACITY 256
 #define MASS_RADIUS 5.0f
 #define MASS_COLOR_SCALE 50.0f
 #define TIME_SCALE 5.0f
@@ -177,6 +177,49 @@ void system_mass_reset_forces(System *system) {
   }
 }
 
+#define INIT_DEFAULT_GRID(system)                                              \
+  system_init_grid(system, 10, 10, (Vector2){10.0f, 10.0f}, 50.0f, 1.0f,       \
+                   10.0f, 1.0f)
+void system_init_grid(System *system, size_t rows, size_t cols, Vector2 origin,
+                      float cell_size, float mass, float spring_strength,
+                      float spring_dampening) {
+  system->mass_count = 0;
+  system->spring_count = 0;
+
+  for (size_t r = 0; r < rows; ++r) {
+    for (size_t c = 0; c < cols; ++c) {
+      Mass m = {0};
+      m.position = Vector2Add(origin, Vector2Scale((Vector2){c, r}, cell_size));
+      m.mass = mass;
+      m.fixed = (r == 0);
+      system_add_mass(system, m);
+    }
+  }
+
+  for (size_t r = 0; r < rows; ++r) {
+    for (size_t c = 0; c < cols; ++c) {
+      size_t m0 = r * cols + c;
+      size_t m1 = r * cols + c + 1;
+      size_t m2 = (r + 1) * cols + c;
+
+      if (c != (cols - 1) && m1 < rows * cols) {
+        system_add_spring(system,
+                          (Spring){.length = cell_size,
+                                   .strength = spring_strength,
+                                   .dampening = spring_dampening},
+                          m0, m1);
+      }
+      if (r != (rows - 1) && m2 < rows * cols) {
+        system_add_spring(system,
+                          (Spring){.length = cell_size,
+                                   .strength = spring_strength,
+                                   .dampening = spring_dampening},
+                          m0, m2);
+      }
+    }
+  }
+}
+
 int main(void) {
   InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Springs");
   SetTargetFPS(60);
@@ -184,41 +227,14 @@ int main(void) {
   _Bool running = false;
 
   System system = {0};
-
-  Mass m1 = {0};
-  m1.position = (Vector2){WINDOW_WIDTH / 2.0f, WINDOW_HEIGHT / 3.0f};
-  m1.fixed = true;
-
-  Mass m2 = {0};
-  m2.position = Vector2Add(m1.position, (Vector2){-150.0f, 150.0f});
-  m2.mass = 10.0f;
-
-  Mass m3 = {0};
-  m3.position = Vector2Add(m2.position, (Vector2){50.0f, -50.0f});
-  m3.mass = 10.0f;
-
-  Mass m4 = {0};
-  m4.position = Vector2Add(m2.position, (Vector2){-50.0f, 50.0f});
-  m4.mass = 10.0f;
-
-  system_add_mass(&system, m1);
-  system_add_mass(&system, m2);
-  system_add_mass(&system, m3);
-  system_add_mass(&system, m4);
-
-  system_add_spring(
-      &system, (Spring){.length = 100.0f, .dampening = 1.0f, .strength = 10.0f},
-      0, 1);
-  system_add_spring(
-      &system, (Spring){.length = 50.0f, .dampening = 1.0f, .strength = 10.0f},
-      1, 2);
-  system_add_spring(
-      &system, (Spring){.length = 50.0f, .dampening = 1.0f, .strength = 10.0f},
-      1, 3);
+  INIT_DEFAULT_GRID(&system);
 
   while (!WindowShouldClose()) {
     if (IsKeyPressed(KEY_SPACE)) {
       running = (running) ? false : true;
+    }
+    if (IsKeyPressed(KEY_ENTER)) {
+      INIT_DEFAULT_GRID(&system);
     }
 
     BeginDrawing();
