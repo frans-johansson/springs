@@ -90,9 +90,14 @@ typedef struct {
   double length;
   double strength;
   double dampening;
+  _Bool cut;
 } Spring;
 
 void spring_update(Spring *spring) {
+  if (spring->cut) {
+    return;
+  }
+
   Vector2 span =
       Vector2Subtract(spring->second->position, spring->first->position);
   Vector2 force_direction = Vector2Normalize(span);
@@ -121,6 +126,9 @@ void spring_update(Spring *spring) {
 }
 
 void spring_draw(Spring *spring) {
+  if (spring->cut) {
+    return;
+  }
   Vector2 span =
       Vector2Subtract(spring->second->position, spring->first->position);
   double relative_displacement =
@@ -249,6 +257,45 @@ void system_init_grid(System *system, size_t rows, size_t cols, Vector2 origin,
                                    .dampening = spring_dampening},
                           m0, m2);
       }
+    }
+  }
+}
+
+void system_handle_mouse_input(System *system) {
+  static Mass *selected = NULL;
+  static _Bool erasing = false;
+  Vector2 mouse_position = GetMousePosition();
+  if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+    for (size_t i = 0; i < system->mass_count; ++i) {
+      Mass *mass = &system->masses[i];
+      if (CheckCollisionPointCircle(mouse_position, mass->position,
+                                    MASS_RADIUS)) {
+        selected = mass;
+        selected->fixed = true;
+        break;
+      }
+    }
+    erasing = true;
+  }
+  if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+    if (selected != NULL) {
+      selected->position = mouse_position;
+    } else if (erasing) {
+      for (size_t i = 0; i < system->spring_count; ++i) {
+        Spring *spring = &system->springs[i];
+        if (CheckCollisionPointLine(mouse_position, spring->first->position,
+                                    spring->second->position, 1.0f)) {
+          spring->cut = true;
+        }
+      }
+    }
+  }
+  if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+    if (selected != NULL) {
+      selected->fixed = false;
+      selected = NULL;
+    } else if (erasing) {
+      erasing = false;
     }
   }
 }
